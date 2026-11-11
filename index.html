@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Pegasus Training Flow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: Pegasus shell (header, left nav, content card) + ticket drawer + slide-in panel. Single light look matching the live product. */
+:root{
+  color-scheme: light;
+  --hdr:#6B7FA0; --hdr-ink:#FFFFFF;
+  --bg:#EEF1F6; --surface:#FFFFFF; --surface-2:#F8FAFC;
+  --ink:#1F2937; --ink-2:#475569; --muted:#5B6678; --line:#E2E8F0; --line-2:#CBD5E1;
+  --primary:#56698A; --primary-ink:#FFFFFF; --link:#3557A6;
+  --trn:#6D4FC2; --trn-ink:#5B3FA0; --trn-bg:#F6F2FD; --trn-line:#D5C8F0;
+  --note:#2E7D6B; --note-bg:#F1FAF6; --note-line:#B7DCCF;
+  --warn-bg:#FFF7E6; --warn-line:#F3C77A; --warn-ink:#713F12;
+  --ok-bg:#ECF8EF; --ok-line:#A7D9B4; --ok-ink:#14532D;
+  --err:#B91C1C; --new:#C2410C; --star:#D97706;
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px}
+button,input,select,textarea{font-family:inherit;font-size:14px;color:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed}
+:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+a,.link{color:var(--link);text-decoration:underline;background:none;border:0;padding:0;font:inherit;cursor:pointer}
+.ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* demo bar */
+.demo{background:#1E293B;color:#E2E8F0;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));font-size:13px}
+.demo b{color:#fff}
+.seg{display:inline-flex;background:#334155;border-radius:8px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;color:#CBD5E1;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500}
+.seg button[aria-pressed="true"]{background:#fff;color:#1E293B}
+.demo .hint{flex:1;min-width:220px;color:#CBD5E1}
+.demo .reset{border:1px solid #64748B;background:none;color:#E2E8F0;border-radius:6px;padding:6px 12px;font-size:13px}
+
+/* header */
+.hdr{background:var(--hdr);color:var(--hdr-ink);display:flex;align-items:center;gap:18px;min-height:60px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));flex-wrap:wrap}
+.logo{font-weight:700;font-style:italic;font-size:16px;line-height:1;letter-spacing:.01em}
+.hdr .sep{width:1px;height:28px;background:rgba(255,255,255,.55)}
+.hdr .app{font-size:21px;font-weight:600}
+.hdr .right{margin-left:auto;display:flex;align-items:center;gap:16px}
+.space{border:1px solid rgba(255,255,255,.5);border-radius:8px;padding:4px 12px;line-height:1.2}
+.space small{display:block;font-size:10px;letter-spacing:.1em;opacity:.9}
+.space b{font-size:15px}
+.avatar{width:34px;height:34px;border-radius:50%;background:#E2E8F0;color:#334155;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.who{line-height:1.25}.who b{display:block;font-size:15px}.who span{font-size:12px}
+.bell{position:relative;border:0;background:none;color:#fff;padding:4px}
+.bell span{position:absolute;top:-4px;right:-6px;background:var(--err);color:#fff;font-size:10px;font-weight:700;border-radius:999px;padding:1px 5px}
+
+/* stats */
+.stats{background:var(--surface);display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.stats .lbl{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:600;margin-right:6px}
+.stat{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#334155;border:1px solid var(--line);border-left:3px solid;border-radius:8px;padding:6px 12px;background:var(--surface)}
+.stat b{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* shell */
+.shell{display:flex;flex-wrap:wrap;align-items:stretch;min-height:calc(100vh - 160px)}
+.side{flex:0 0 260px;background:var(--surface);padding-block:10px}
+.side .sec{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:600;padding:16px 24px 6px}
+.side .it{display:flex;align-items:center;gap:12px;padding:10px 24px;font-size:15px;color:#64748B}
+.side .on{background:var(--bg);border-right:3px solid var(--hdr);color:#3F5275;font-weight:600}
+.main{flex:999 1 560px;min-width:0;padding-block:20px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.card{background:var(--surface);border-radius:12px;padding:18px 22px}
+@media (max-width:900px){
+  .side{flex-basis:100%;display:flex;overflow-x:auto;padding:0}
+  .side .sec,.side div.it:not(.on){display:none}
+  .side button.it{white-space:nowrap}
+  .side .on{border-right:0;border-bottom:3px solid var(--hdr);width:100%}
+}
+
+/* tabs */
+.tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;color:var(--ink-2);padding:11px 14px;border-bottom:2px solid transparent;border-radius:6px 6px 0 0}
+.tab[aria-selected="true"]{color:var(--ink);font-weight:600;background:var(--bg);border-bottom-color:var(--hdr)}
+.tab.na{color:#94A3B8}
+
+/* table */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th{text-align:left;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600;padding:13px 14px;background:var(--surface-2);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:13px 14px;border-bottom:1px solid #EEF2F6;font-size:14px;vertical-align:middle}
+tbody tr:hover{background:#F8FAFC}
+tr.row{cursor:pointer}
+td.num{font-variant-numeric:tabular-nums}
+.more{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--ink-2);background:var(--surface);color:var(--ink-2);line-height:1}
+.empty{padding:40px 16px;text-align:center;color:var(--ink-2)}
+
+/* chips & tags */
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.st-open{background:#E8F0FE;color:#1D4ED8}
+.st-prog{background:#FEF3C7;color:#92400E}
+.st-done{background:#DDF4F1;color:#0F6B5F}
+.st-closed{background:#E5F5E8;color:#1B6B2E}
+.st-dc{background:#EEF4FF;color:#1E40AF;border:1px solid #BFD3FB}
+.tag{font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 8px;border-radius:5px;border:1px solid var(--line-2);color:var(--ink-2);background:var(--surface)}
+.tag.note{color:#1F6B57;border-color:var(--note-line);background:var(--note-bg)}
+.tag.trn{color:var(--trn-ink);border-color:var(--trn-line);background:var(--trn-bg)}
+.tag.closed{color:#1B6B2E;border-color:#A7D9B4;background:#ECF8EF}
+.new{font-size:10px;font-weight:700;color:#fff;background:var(--new);padding:2px 6px;border-radius:4px;letter-spacing:.04em}
+.p-Critical{color:#B91C1C;font-weight:600}.p-High{color:#C2410C;font-weight:600}.p-Medium{color:#B45309;font-weight:600}.p-Low{color:#15803D;font-weight:600}
+.yes{color:#B91C1C;font-weight:600}
+.fw{display:inline-block;border:1px solid #BFD3FB;background:#F1F6FF;color:#1E3A8A;border-radius:6px;padding:2px 8px;font-variant-numeric:tabular-nums}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border:1.5px solid var(--primary);border-radius:6px;background:var(--surface);color:#3F5275;font-weight:500;white-space:nowrap}
+.btn.pri{background:var(--primary);color:var(--primary-ink)}
+.btn:disabled{background:#E2E8F0;color:#475569;border-color:var(--line-2)}
+.btn.ghost{border-color:var(--line-2);color:var(--ink-2)}
+.btn.danger{background:#9F1239;border-color:#9F1239;color:#fff}
+
+/* drawer */
+.backdrop{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(1040px,100%);background:var(--surface);z-index:21;display:flex;flex-direction:column;box-shadow:-10px 0 30px rgba(15,23,42,.2)}
+.dr-hd{background:var(--hdr);color:#fff;display:flex;align-items:center;gap:14px;padding:calc(10px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 10px 24px;flex-wrap:wrap}
+.dr-hd h2{margin:0;font-size:30px;font-weight:500}
+.dr-hd .x{margin-left:auto;border:0;background:none;color:#fff;width:40px;height:40px;display:flex;align-items:center;justify-content:center}
+.dr-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) 24px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;padding:14px 0;align-items:center}
+.actions .grow{flex:1}
+.banner{display:flex;align-items:flex-start;gap:12px;border-radius:8px;padding:12px 16px;font-size:14px;line-height:1.5}
+.banner.warn{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-ink)}
+.banner.ok{background:var(--ok-bg);border:1px solid var(--ok-line);color:var(--ok-ink)}
+.banner.info{background:#EEF4FF;border:1px solid #BFD3FB;color:#1E3A8A}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px;padding:16px 0}
+.search{display:flex;align-items:center;gap:8px;border-bottom:1px solid #94A3B8;padding:6px 2px;color:var(--muted);flex:1 1 220px;max-width:380px}
+.search input{border:0;outline:none;flex:1;min-width:0;background:none}
+.newwrap{position:relative;display:inline-flex}
+.newwrap .new{position:absolute;top:-9px;right:-8px}
+
+/* timeline */
+.day{display:flex;align-items:center;gap:12px;margin:8px 0}
+.day::before,.day::after{content:"";flex:1;height:1px;background:var(--line)}
+.day span{background:var(--hdr);color:#fff;font-size:13px;font-weight:600;padding:5px 14px;border-radius:999px;font-variant-numeric:tabular-nums}
+.ev{display:flex;gap:14px;margin-bottom:12px}
+.ev .dot{width:18px;height:18px;border-radius:50%;border:3px solid #64748B;background:var(--surface);flex:none;margin-top:13px}
+.ev .box{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.ev .hd{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:11px 16px;font-weight:600}
+.ev .t{margin-left:auto;font-size:12px;color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
+.ev .bd{padding:11px 16px;border-top:1px solid #EEF2F6;line-height:1.55;background:var(--surface-2)}
+.ev.note .dot{border-color:var(--note)} .ev.note .box{border-left:4px solid var(--note)} .ev.note .bd{background:#F6FBF9}
+.ev.trn .dot{border-color:var(--trn)} .ev.trn .box{border-left:4px solid var(--trn)} .ev.trn .bd{background:#FAF8FE}
+.ev.cls .dot{border-color:#1B6B2E}
+.grp-btn{width:100%;display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:11px 16px;border:0;background:var(--surface);text-align:left;font-weight:600}
+.grp-meta{font-weight:400;color:var(--ink-2);font-size:13px}
+.sub{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;padding:10px 16px 10px 46px;border-top:1px dashed #E4DCF5;font-size:13px;line-height:1.55;background:#FCFBFF}
+.sub .when{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.file{display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:var(--surface);margin:6px 6px 0 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:600px){.sub{grid-template-columns:1fr;padding-left:16px;gap:2px}}
+
+/* details grids */
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;padding:18px 0}
+.kv .k{font-size:12px;color:var(--ink-2);font-weight:600;margin-bottom:4px}
+.kv .v{font-size:15px;overflow-wrap:anywhere}
+.tree{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.tree div{border:1px solid var(--line-2);padding:10px 14px;border-radius:2px;width:max-content;max-width:100%}
+
+/* slide-in panel */
+.panel-bd{position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:30}
+.panel{position:fixed;top:0;right:0;bottom:0;width:min(540px,100%);background:var(--surface);z-index:31;display:flex;flex-direction:column;box-shadow:-12px 0 32px rgba(15,23,42,.25)}
+.panel-hd{display:flex;gap:12px;align-items:flex-start;padding:calc(20px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) 16px 24px;border-bottom:1px solid var(--line)}
+.panel-hd h3{margin:0;font-size:20px}
+.panel-hd p{margin:4px 0 0;color:var(--ink-2);font-size:13px}
+.panel-body{flex:1;overflow-y:auto;padding:18px max(20px,env(safe-area-inset-right,0px)) 18px 24px;display:flex;flex-direction:column;gap:20px}
+.panel-ft{display:flex;justify-content:flex-end;gap:10px;padding:14px max(20px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) 24px;border-top:1px solid var(--line)}
+.sec-t{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--ink-2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.auto{font-size:10px;font-weight:700;letter-spacing:.06em;color:#1D4ED8;background:#E8F0FE;padding:2px 6px;border-radius:4px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid2 .full{grid-column:1/-1}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+label.l,.l{display:block;font-size:12px;color:var(--ink-2);font-weight:600;margin-bottom:6px}
+.ro{background:#F1F5F9;border:1px solid var(--line);border-radius:6px;padding:9px 12px;overflow-wrap:anywhere}
+.inp{width:100%;border:1px solid #94A3B8;border-radius:6px;padding:9px 12px;background:var(--surface)}
+.inp[aria-invalid="true"]{border-color:var(--err)}
+.err{color:var(--err);font-size:12px;margin-top:5px}
+.help{color:var(--ink-2);font-size:12px;margin-top:6px}
+textarea.inp{resize:vertical;line-height:1.5}
+
+/* trainer detail */
+.td-top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;margin:12px 0 16px}
+.td-top h2{margin:0;font-size:30px;font-weight:600;color:var(--primary)}
+.td-top .push{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.cols{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.cols .l3{flex:3 1 480px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.cols .l2{flex:2 1 320px;min-width:0}
+.box2{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.box2 h3{margin:0 0 12px;font-size:16px}
+.req{background:var(--surface-2);border:1px solid #EEF2F6;border-radius:8px;padding:12px 14px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.drop{border:1.5px dashed #94A3B8;border-radius:8px;padding:14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;color:var(--ink-2)}
+.drop label{color:var(--link);text-decoration:underline;cursor:pointer}
+.tline{border-left:2px solid var(--line);margin-left:6px;display:flex;flex-direction:column;gap:18px}
+.tl-i{display:flex;gap:12px;margin-left:-8px}
+.tl-i .d{width:14px;height:14px;border-radius:50%;border:3px solid var(--trn);background:var(--surface);flex:none;margin-top:3px}
+.tl-i .h{font-weight:600;font-size:13px}
+.tl-i .w{font-size:12px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.tl-i .b{font-size:13px;line-height:1.55;margin-top:6px;color:#334155;overflow-wrap:anywhere}
+
+/* pilot */
+.phones{display:flex;flex-wrap:wrap;gap:20px}
+.phone{flex:0 1 360px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.sms{background:#F1F5F9;border-radius:14px;padding:12px 14px;line-height:1.5;font-size:14px}
+.stars{display:flex;gap:6px}
+.star{border:0;background:none;padding:2px;width:44px;height:44px;display:flex;align-items:center;justify-content:center}
+.star svg{width:30px;height:30px}
+
+/* nav buttons */
+.side button.it{border:0;background:none;width:100%;text-align:left;color:#334155;cursor:pointer}
+.side button.it.on{background:var(--bg);color:#3F5275}
+.demo select{background:#334155;color:#fff;border:1px solid #64748B;border-radius:6px;padding:5px 8px;margin-left:6px;font-size:13px}
+
+/* delivery tracker */
+.dt-top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;border-bottom:1px solid var(--line)}
+.did{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;border:1px solid var(--line-2);background:var(--surface-2);border-radius:4px;padding:2px 7px;color:#334155;white-space:nowrap}
+.sect{border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden}
+.sect-hd{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 14px}
+.sect-bar{width:4px;height:22px;border-radius:2px;flex:none}
+.sect-t{font-weight:700;letter-spacing:.06em;font-size:14px}
+.owner{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+.stamp{font-size:11px;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:var(--surface)}
+.sect-ctl{margin-left:auto;display:flex;gap:8px;align-items:center}
+.mini{min-height:30px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface);font-size:12px;padding:0 8px;color:var(--ink-2);display:inline-flex;align-items:center}
+.sect-body{background:var(--surface);padding:16px;border-top:1px solid var(--line)}
+
+/* toast */
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:#14532D;color:#fff;padding:12px 18px;border-radius:8px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100% - 32px);font-size:14px}
+@media (prefers-reduced-motion:no-preference){.panel,.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+const TRAINER = 'Uma Bandi Maheshwar';
+const USERS = [
+  {id:'ronak', name:'Ronak', role:'CRM Manager'},
+  {id:'rahul', name:'Rahul', role:'Sales'},
+  {id:'mahesh', name:'Mahesh', role:'Delivery & Logistics'},
+  {id:'uma', name:'Uma Bandi Maheshwar', role:'Trainer'}
+];
+const me = () => USERS.find(u => u.id === S.user) || USERS[0];
+const mkD = (id,cust,type,disp,status,uin) => ({id, cust, type, product:'Krishak 2i', fy:'2026-2027', disp, status, uin, ins:'NO', pilot:{date:'',name:'',phone:'',email:''}});
+const D = (y,m,d,h,mi) => new Date(y, m-1, d, h||0, mi||0);
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const pad = n => String(n).padStart(2,'0');
+const fD = d => d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear();
+const fT = d => { let h=d.getHours(), ap=h>=12?'PM':'AM'; h=h%12||12; return pad(h)+':'+pad(d.getMinutes())+' '+ap; };
+const fDT = d => fD(d)+', '+fT(d);
+const fISO = s => { if(!s) return ''; const [y,m,d]=s.split('-').map(Number); return fD(new Date(y,m-1,d)); };
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const kb = n => n>1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB';
+
+const I = {
+  x:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  search:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  filter:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 8v6l-4-2v-4z"/></svg>',
+  cap:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>',
+  lock:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  warn:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>',
+  check:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
+  down:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
+  right:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  file:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>',
+  up:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg>',
+  sms:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>',
+  bell:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="width:22px;height:22px"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20h4"/></svg>',
+  star:(on)=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z" fill="'+(on?'var(--star)':'none')+'" stroke="var(--star)" stroke-width="1.6"/></svg>'
+};
+
+function seed(){
+  return {
+    role:'agent', listTab:'open', openTicket:null, tab:'timeline', panel:false, pdraft:null, perr:{},
+    closeConfirm:false, tlSearch:'', addNote:false, noteText:'', expanded:{},
+    trainerTab:'open', trainerSearch:'', openTrn:null, draft:null, derr:'',
+    ratings:{}, nextTrn:1001, trainings:[],
+    openReq:null, cdraft:null, cSearch:'',
+    user:'ronak', nav:'parents', openDelivery:null, dDraft:null, dSearch:'', trainerType:'all', panelSrc:'ticket',
+    deliveries:[
+      mkD('K2i00127','MAHINDRA & MAHINDRA LTD.','B2B','06 Nov 2026','In Transit',''),
+      mkD('K2i00056','Mihir Shah','Dealer','06 Nov 2026','In Transit',''),
+      mkD('K2i00174','Mihir Shah','Dealer','','Delivered','Pending'),
+      mkD('K2i00121','Mihir Shah','Dealer','','Delivered','Pending'),
+      mkD('K2i00150','Mihir Shah','Dealer','','Delivered','Pending'),
+      mkD('K2i00107','Mihir Shah','Dealer','','Delivered','Pending'),
+      mkD('K2i00048','Mihir Shah','Dealer','30 Oct 2026','Delivered',''),
+      mkD('K2i00049','Mihir Shah','Dealer','','Delivered','Pending'),
+      mkD('K2i00090','Mihir Shah','Dealer','','Delivered','Pending'),
+      mkD('K2i00173','Mihir Shah','Dealer','','Delivered','Pending')
+    ],
+    parents:[
+      {no:17212, drone:'K2i00005', raised:D(2026,11,10), status:'--', cust:'BASF INDIA LIMITED', grounded:'No', prio:'Medium', fw:'9.5.2',
+       title:'My drone is crashed - No My drone is flying - Yes Others', desc:'[Drone code entered by customer: K2I000 (not found in Pegasus)]',
+       category:['My drone is crashed - No','My drone is flying - Yes','Others'], info:null, pilot:{name:'',phone:'',email:''}, closed:false,
+       events:[
+        {kind:'updated',by:'75-Ganesh Kshirasagar',at:D(2026,11,10,10,4),title:'updated the ticket',text:'Added 4 media\nState changed from null to Karnataka\nCustomer Type changed from null to Dealer'},
+        {kind:'note',by:'75-Ganesh Kshirasagar',at:D(2026,11,10,10,4,1),title:'added ticket note',text:'Note: Connected with the pilot through a video call to troubleshoot the pump issue. We checked and cleaned the pump, but the same issue persists. The pump is still not drawing water.'},
+        {kind:'note',by:'75-Ganesh Kshirasagar',at:D(2026,11,10,10,52),title:'added ticket note',text:'Note: I discussed the matter with Vikas. He said that he would discuss it with the CP and update me.'},
+        {kind:'note',by:'75-Ganesh Kshirasagar',at:D(2026,11,10,13,57),title:'added ticket note',text:'Note: Pending from customer.'}
+       ]},
+      {no:17203, drone:'K2i00012', raised:D(2026,11,9), status:'--', cust:'Agronomics Pvt Ltd', grounded:'Yes', prio:'Critical', fw:'8.5.2', pilot:{name:'',phone:'',email:''}, closed:false, events:[]},
+      {no:17172, drone:'K1i00096', raised:D(2026,11,8), status:'Data Collected', cust:'IFFCO', grounded:'Yes', prio:'Critical', fw:'8.1.2', pilot:{name:'',phone:'',email:''}, closed:false, events:[]},
+      {no:17171, drone:'K2i00104', raised:D(2026,11,8), status:'--', cust:'Agriown Pvt Ltd', grounded:'Yes', prio:'Critical', fw:'9.5.3', pilot:{name:'',phone:'',email:''}, closed:false, events:[]},
+      {no:17167, drone:'K2i00038', raised:D(2026,11,7), status:'--', cust:'BASF INDIA LIMITED', grounded:'No', prio:'Medium', fw:'9.5.2', pilot:{name:'',phone:'',email:''}, closed:false, events:[]},
+      {no:17157, drone:'KAS00068', raised:D(2026,11,7,13,30), status:'Data Collected', cust:'Centurion University', grounded:'Yes', prio:'Critical', fw:'2.6.9',
+       info:{crash:'Crashed', raisedBy:'Vtarakeswararao', email:'vtarakeswararao@gramtarang.org', lastUpd:'Ganesh Kshirasagar · 10 Nov 2026, 01:56 PM', avail:'7 Nov 2026, 12:00 PM – 03:00 PM', owner:'Meenakshi · L3 FCS'},
+       pilot:{name:'Vtarakeswararao',phone:'',email:'vtarakeswararao@gramtarang.org'}, closed:false,
+       events:[
+        {kind:'created',by:'Vtarakeswararao',at:D(2026,11,7,13,30),title:'created the ticket'},
+        {kind:'updated',by:'Ganesh Kshirasagar',at:D(2026,11,10,13,56),title:'updated the ticket',text:'Current status: Data Collected'}
+       ]},
+      {no:17120, drone:'K2i00073', raised:D(2026,11,6), status:'Data Collected', cust:'Agriown Pvt Ltd', grounded:'No', prio:'Medium', fw:'9.5.3', pilot:{name:'',phone:'',email:''}, closed:false, events:[]}
+    ]
+  };
+}
+let S = seed();
+
+const P = no => S.parents.find(p => p.no === no);
+const T = id => S.trainings.find(t => t.id === id);
+const DL = id => S.deliveries.find(d => d.id === id);
+const srcLabel = t => t.parent ? 'Ticket #'+t.parent : t.delivery ? 'Delivery · '+t.delivery : 'Client · '+t.client+' (via '+t.via+')';
+const where = t => t.parent ? 'Ticket-'+t.parent : t.delivery ? 'the Pilot & Field section of '+t.delivery : 'Parent Tickets and the Ticket creator list';
+const typeChip = t => t.type==='Commissioning' ? '<span class="chip" style="background:#CCFBF1;color:#115E59">Commissioning</span>'
+  : t.type==='Client Request' ? '<span class="chip" style="background:#EDE9FE;color:#5B21B6">Client Request</span>'
+  : '<span class="chip" style="background:#FEE2E2;color:#991B1B">Incident</span>';
+const CREATOR_SEED = [
+  {no:15230, subj:'My drone is crashed - No My drone is flying - No...', on:'17 Sep 2026'},
+  {no:15094, subj:'My drone is crashed - No My drone is flying - No...', on:'15 Sep 2026'},
+  {no:15085, subj:'My drone is crashed - No My drone is flying - Ye...', on:'15 Sep 2026'},
+  {no:14334, subj:'My drone is crashed - No My drone is flying - No...', on:'05 Aug 2026'}
+];
+function custMap(){
+  const m = {};
+  S.parents.forEach(p => { (m[p.cust] = m[p.cust] || new Set()).add(p.drone); });
+  S.deliveries.forEach(d => { (m[d.cust] = m[d.cust] || new Set()).add(d.id); });
+  return m;
+}
+const trnsOf = no => S.trainings.filter(t => t.parent === no);
+const stCls = s => ({'Open':'st-open','In Progress':'st-prog','Training Completed':'st-done','Closed':'st-closed'}[s]||'st-open');
+const chip = s => '<span class="chip '+stCls(s)+'">'+esc(s)+'</span>';
+const lastAt = t => t.events[t.events.length-1].at;
+
+let toastTimer;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>{ el.hidden = true; }, 4200);
+}
+
+/* ---------- demo bar ---------- */
+function demoBar(){
+  const hints = {
+    agent:'Flow 1: Parent Tickets → Ticket-17157 → Timeline → Initiate Training. Flow 2: Delivery Tracker → edit a drone → Pilot & Field → Initiate Training.',
+    creator:'Flow 3: use Initiate Training (next to Need Any Support?) to log a client’s chargeable training request from a call or email.',
+    trainer:'Open a training ticket, save updates, set status to Training Completed, then send the SMS.',
+    pilot:'Stand-in for the existing SMS link: pick a rating and confirm to auto-close the training ticket.'
+  };
+  const b = (v,l) => '<button data-act="role" data-v="'+v+'" aria-pressed="'+(S.role===v)+'">'+l+'</button>';
+  return '<div class="demo"><b>Prototype</b><span>Viewing as</span><div class="seg" role="group" aria-label="Viewing as">'+
+    b('agent','Pegasus user')+b('creator','Ticket creator')+b('trainer','Trainer')+b('pilot','Pilot (SMS link)')+'</div>'+
+    (S.role==='agent' ? '<label>Logged in as<select id="userSel">'+USERS.map(u=>'<option value="'+u.id+'"'+(S.user===u.id?' selected':'')+'>'+esc(u.name)+' ('+esc(u.role)+')</option>').join('')+'</select></label>' : '')+
+    '<span class="hint">'+hints[S.role]+'</span><button class="reset" data-act="reset">Reset demo</button></div>';
+}
+
+/* ---------- agent ---------- */
+function agentApp(){
+  const u = me();
+  const navBtn = (k,l) => '<button class="it'+(S.nav===k?' on':'')+'" data-act="nav" data-v="'+k+'"'+(S.nav===k?' aria-current="page"':'')+'>'+l+'</button>';
+  return '<header class="hdr"><div class="logo">General<br>Aeronautics</div><div class="sep"></div><div class="app">GA Pegasus</div>'+
+    '<div class="right"><div class="space"><small>SPACE</small><b>GA Krishak</b></div><div class="avatar">'+esc(u.name.split(' ').map(w=>w[0]).slice(0,2).join(''))+'</div><div class="who"><b>'+esc(u.name)+'</b><span>'+esc(u.role)+'</span></div></div></header>'+
+    (S.nav==='delivery'
+      ? '<div class="stats"><span class="stat" style="border-left-color:#56698A">Delivery Requests <b>519</b></span></div>'+
+        '<div class="shell"><nav class="side" aria-label="Pegasus menu">'+sideNav(navBtn)+'</nav><main class="main"><div class="card">'+deliveryList()+'</div></main></div>'+
+        (S.openDelivery ? deliveryDrawer(DL(S.openDelivery)) : '')
+      : agentParents(navBtn));
+}
+function sideNav(navBtn){
+  return '<div class="sec">OVERVIEW</div><div class="it">Dashboard</div>'+
+    '<div class="sec">TICKETS</div>'+navBtn('parents','Parent Tickets')+'<div class="it">Child Tickets</div><div class="it">Drone CRM Mapping</div>'+
+    '<div class="sec">FIELD OPERATIONS</div><div class="it">Drones</div><div class="it">Jobs</div><div class="it">Job Scheduler</div><div class="it">Field Map</div>'+
+    '<div class="sec">LOGISTICS &amp; FINANCE</div><div class="it">Material Pricing</div>'+navBtn('delivery','Delivery Tracker')+'<div class="it">ERP Material Code</div><div class="it">Shipment Tracker</div>';
+}
+function agentParents(navBtn){
+  return '<div class="stats"><span class="lbl">OPEN PARENT TICKETS</span>'+
+      '<span class="stat" style="border-left-color:#2F5BEA">Open <b style="color:#1D4ED8">308</b></span>'+
+      '<span class="stat" style="border-left-color:#C62828">Critical <b style="color:#B91C1C">120</b></span>'+
+      '<span class="stat" style="border-left-color:#EA580C">High <b style="color:#C2410C">123</b></span>'+
+      '<span class="stat" style="border-left-color:#A16207">Customer Pending <b style="color:#92400E">89</b></span>'+
+      '<span class="stat" style="border-left-color:#7C3AED">Grounded <b style="color:#6D28D9">146</b></span>'+
+      '<span class="stat" style="border-left-color:#BE123C">Crashed <b style="color:#9F1239">124</b></span></div>'+
+    '<div class="shell"><nav class="side" aria-label="Pegasus menu">'+sideNav(navBtn)+'</nav>'+
+    '<main class="main"><div class="card">'+parentList()+'</div></main></div>'+
+    (S.openTicket ? drawer(P(S.openTicket)) : '') + (S.openReq ? reqDrawer(T(S.openReq)) : '');
+}
+
+function parentList(){
+  const rows = S.parents.filter(p => S.listTab==='open' ? !p.closed : p.closed);
+  const reqs = S.trainings.filter(t => t.type==='Client Request' && (S.listTab==='open' ? t.status!=='Closed' : t.status==='Closed')).slice().reverse();
+  const tab = (v,l) => '<button class="tab" role="tab" data-act="listTab" data-v="'+v+'" aria-selected="'+(S.listTab===v)+'">'+l+'</button>';
+  let h = '<div class="tabs" role="tablist">'+tab('open','Open')+tab('closed','Closed')+'</div>';
+  h += '<div class="tbl-wrap"><table><thead><tr><th>Ticket No</th><th>Drone ID</th><th>Raised Date</th><th>Ticket Current Status</th><th>Cust. Name</th><th>Grounded</th><th>Priority</th><th>Firmware</th><th>Training <span class="new">NEW</span></th><th>Manage</th></tr></thead><tbody>';
+  if(!rows.length && !reqs.length) h += '<tr><td colspan="10" class="empty">'+(S.listTab==='closed'?'No tickets closed in this demo yet.':'No open tickets.')+'</td></tr>';
+  const dash = '<span style="color:#94A3B8">—</span>';
+  reqs.forEach(t => {
+    h += '<tr class="row" data-act="openReq" data-id="'+t.id+'" style="background:#FBFAFF"><td><b>'+t.id+'</b><div style="margin-top:4px">'+typeChip(t)+'</div></td><td>'+(t.drone?esc(t.drone):dash)+'</td><td class="num">'+fD(t.createdAt)+'</td>'+
+      '<td>'+chip(t.status)+'</td><td>'+esc(t.client)+'</td><td>'+dash+'</td><td>'+dash+'</td><td>'+dash+'</td>'+
+      '<td><span class="chip '+stCls(t.status)+'">'+t.id+' · '+esc(t.status)+'</span></td>'+
+      '<td><button class="more" data-act="openReq" data-id="'+t.id+'" aria-label="Open '+t.id+'">···</button></td></tr>';
+  });
+  rows.forEach(p => {
+    const tr = trnsOf(p.no);
+    h += '<tr class="row" data-act="openTicket" data-no="'+p.no+'"><td class="num">'+p.no+'</td><td>'+p.drone+'</td><td class="num">'+fD(p.raised)+'</td>'+
+      '<td>'+(p.status==='--'?'--':'<span class="chip st-dc">'+esc(p.status)+'</span>')+'</td><td>'+esc(p.cust)+'</td>'+
+      '<td class="'+(p.grounded==='Yes'?'yes':'')+'">'+p.grounded+'</td><td class="p-'+p.prio+'">'+p.prio+'</td><td><span class="fw">'+p.fw+'</span></td>'+
+      '<td>'+(tr.length ? tr.map(t => '<div style="margin:2px 0"><span class="chip '+stCls(t.status)+'">'+t.id+' · '+esc(t.status)+'</span></div>').join('') : '<span style="color:#94A3B8">—</span>')+'</td>'+
+      '<td><button class="more" data-act="openTicket" data-no="'+p.no+'" aria-label="Open ticket '+p.no+'">···</button></td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
+function drawer(p){
+  const open = trnsOf(p.no).filter(t => t.status !== 'Closed');
+  const blocked = open.length > 0;
+  let h = '<div class="backdrop" data-act="closeDrawer"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Ticket-'+p.no+'">';
+  h += '<div class="dr-hd"><h2>Ticket-'+p.no+'</h2>'+(p.closed?'<span class="chip st-closed">Closed</span>':'<span class="chip" style="background:#FEF3C7;color:#92400E">Open</span>')+
+       '<button class="x" data-act="closeDrawer" aria-label="Close ticket view">'+I.x+'</button></div>';
+  h += '<div class="dr-scroll">';
+  // actions
+  h += '<div class="actions"><button class="btn" data-act="na">Create Job</button><button class="btn" data-act="na">Child Ticket</button><button class="btn" data-act="na">Escalate</button><button class="btn" data-act="na">Send Closure SMS</button><span class="grow"></span>';
+  if(p.closed) h += '<button class="btn" disabled>'+I.check+'Ticket Closed</button>';
+  else if(blocked) h += '<button class="btn" disabled aria-describedby="blk">'+I.lock+'Close Ticket</button>';
+  else h += '<button class="btn pri" data-act="askClose">Close Ticket</button>';
+  h += '</div>';
+  if(!p.closed && blocked){
+    h += '<div id="blk" class="banner warn" role="note">'+I.warn+'<span><b>Close Ticket is disabled.</b> '+
+      (open.length===1 ? 'Training ticket <button class="link" data-act="goTrn" data-id="'+open[0].id+'">'+open[0].id+'</button> is still open ('+esc(open[0].status)+').'
+                       : open.length+' training tickets are still open: '+open.map(t=>'<button class="link" data-act="goTrn" data-id="'+t.id+'">'+t.id+'</button>').join(', ')+'.')+
+      ' You can close this ticket once all linked training tickets are closed.</span></div>';
+  } else if(!p.closed && trnsOf(p.no).length){
+    h += '<div class="banner ok" role="note">'+I.check+'<span><b>All linked training tickets are closed.</b> You can now close this ticket.</span></div>';
+  }
+  if(S.closeConfirm && !p.closed){
+    h += '<div class="banner info" style="margin-top:10px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">Close Ticket-'+p.no+'? This marks the parent ticket as closed.</span>'+
+         '<button class="btn ghost" data-act="cancelClose">Cancel</button><button class="btn pri" data-act="confirmClose">Close ticket</button></div>';
+  }
+  // tabs
+  const tabs = [['issue','Issue Details'],['details','Ticket Details'],['media','Media'],['timeline','Timeline'],['cost','Cost Estimation'],['life','Lifecycle'],['fw','Firmware & Drone Config'],['jobs','Jobs'],['linked','Linked Tickets'],['rem','Reminders']];
+  const live = ['issue','details','timeline'];
+  h += '<div class="tabs" role="tablist" style="margin-top:14px">'+tabs.map(([k,l]) => '<button class="tab'+(live.includes(k)?'':' na')+'" role="tab" data-act="tab" data-v="'+k+'" aria-selected="'+(S.tab===k)+'">'+esc(l)+'</button>').join('')+'</div>';
+  if(S.tab==='timeline') h += timelineTab(p);
+  else if(S.tab==='issue') h += issueTab(p);
+  else if(S.tab==='details') h += detailsTab(p);
+  else h += '<div class="empty">This tab is not part of the training prototype.</div>';
+  h += '</div>';
+  if(S.panel && S.panelSrc==='ticket') h += panel();
+  return h + '</aside>';
+}
+
+function issueTab(p){
+  if(!p.title) return '<div class="empty">Issue details for this ticket are not loaded in the prototype. Try Ticket-17212.</div>';
+  return '<div style="padding:18px 0;display:flex;flex-direction:column;gap:16px"><div><div class="l">Title</div><div style="font-size:16px">'+esc(p.title)+'</div></div>'+
+    '<div><div class="l">Description</div><div style="font-size:16px">'+esc(p.desc)+'</div></div>'+
+    '<div><div class="l">Category</div><div class="tree">'+p.category.map((c,i)=>'<div style="margin-left:'+(i*28)+'px">'+esc(c)+'</div>').join('')+'</div></div></div>';
+}
+function detailsTab(p){
+  const f = (k,v) => '<div><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+  let h = '<div class="kv">'+f('Current Status', p.status==='--'?'--':'<span class="chip st-dc">'+esc(p.status)+'</span>')+f('Customer',esc(p.cust))+f('Drone',p.drone+' · '+p.prio)+f('Grounded',p.grounded)+f('Firmware',p.fw);
+  if(p.info){ const i=p.info; h += f('Last Updated',esc(i.lastUpd))+f('Crash Type','<span class="yes">'+esc(i.crash)+'</span>')+f('Raised By',esc(i.raisedBy))+f('Raised At',fDT(p.raised))+f('Email',esc(i.email))+f('Customer available to talk',esc(i.avail))+f('Ticket Owner',esc(i.owner)); }
+  return h+'</div>';
+}
+
+function timelineTab(p){
+  let h = '<div class="toolbar"><label class="search"><span class="sr">Search timeline</span><input id="tlSearch" type="search" placeholder="Search here..." value="'+esc(S.tlSearch)+'">'+I.search+'</label>'+
+    '<button class="btn" data-act="na">'+I.filter+'Filter</button><button class="btn" data-act="toggleNote"'+(p.closed?' disabled':'')+'>Add Event</button>'+
+    '<span class="newwrap"><button class="btn pri" data-act="openPanel"'+(p.closed?' disabled':'')+'>'+I.cap+'Initiate Training</button><span class="new">NEW</span></span></div>';
+  if(S.addNote && !p.closed){
+    h += '<div class="box2" style="margin-bottom:14px"><label class="l" for="noteText">Add a ticket note</label><textarea id="noteText" class="inp" rows="3">'+esc(S.noteText)+'</textarea>'+
+         '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px"><button class="btn ghost" data-act="toggleNote">Cancel</button><button class="btn pri" data-act="saveNote">Add Note</button></div></div>';
+  }
+  return h + '<div id="tlList">'+timelineList(p)+'</div>';
+}
+
+function timelineList(p){
+  const q = S.tlSearch.trim().toLowerCase();
+  let items = p.events.map(e => ({at:e.at, txt:(e.by+' '+e.title+' '+(e.text||'')+' '+(e.trn||'')).toLowerCase(), html:evCard(e)}));
+  trnsOf(p.no).forEach(t => items.push({at:lastAt(t), txt:(t.id+' training '+t.events.map(e=>e.lines.join(' ')+' '+(e.comment||'')).join(' ')).toLowerCase(), html:groupCard(t)}));
+  if(q) items = items.filter(i => i.txt.includes(q));
+  if(!items.length) return '<div class="empty">'+(q?'No timeline events match your search.':'No timeline events for this ticket in the prototype.')+'</div>';
+  items.sort((a,b) => b.at - a.at);
+  const days = [];
+  items.forEach(i => { const k = fD(i.at); let d = days.find(x=>x.k===k); if(!d){ d={k,items:[]}; days.push(d); } d.items.push(i); });
+  return days.map(d => '<div class="day"><span>'+d.k+' · '+d.items.length+'</span></div>'+d.items.map(i=>i.html).join('')).join('');
+}
+
+function evCard(e){
+  if(e.kind==='training'){
+    const t = T(e.trn);
+    return '<div class="ev trn"><div class="dot"></div><div class="box"><div class="hd"><span class="tag trn">TRAINING</span>'+esc(e.by)+' initiated training<span class="t">'+fT(e.at)+'</span></div>'+
+      '<div class="bd">Training ticket created with ticket ID <button class="link" data-act="goTrn" data-id="'+e.trn+'" style="font-weight:600">'+e.trn+'</button> · Assigned to '+esc(t.trainer)+'</div></div></div>';
+  }
+  const map = {note:['note','NOTE','note'], updated:['','UPDATED',''], created:['','CREATED',''], closed:['cls','CLOSED','closed']};
+  const [cls,label,tcls] = map[e.kind];
+  return '<div class="ev '+cls+'"><div class="dot"></div><div class="box"><div class="hd"><span class="tag '+tcls+'">'+label+'</span>'+esc(e.by)+' '+esc(e.title)+'<span class="t">'+fT(e.at)+'</span></div>'+
+    (e.text?'<div class="bd" style="white-space:pre-line">'+esc(e.text)+'</div>':'')+'</div></div>';
+}
+
+function groupCard(t){
+  const open = !!S.expanded[t.id];
+  let h = '<div class="ev trn"><div class="dot"></div><div class="box"><button class="grp-btn" data-act="toggleGrp" data-id="'+t.id+'" aria-expanded="'+open+'">'+(open?I.down:I.right)+
+    '<span class="tag trn">TRAINING</span><span>Training ticket '+t.id+'</span>'+chip(t.status)+
+    '<span class="grp-meta">'+(t.type==='Commissioning'?'Raised by '+esc(t.createdBy)+' · ':'')+esc(t.trainer)+' · '+t.events.length+' update'+(t.events.length>1?'s':'')+(t.rating?' · Rated '+t.rating+'/5':(t.expected?' · Expected '+fISO(t.expected):''))+'</span>'+
+    '<span class="t" style="margin-left:auto;font-size:12px;color:var(--muted);font-weight:400">Last update '+fT(lastAt(t))+'</span></button>';
+  if(open){
+    h += t.events.slice().reverse().map(e => '<div class="sub"><span class="when">'+fDT(e.at).replace(', '+e.at.getFullYear(),'')+'</span><span><b>'+esc(e.by)+'</b> · '+e.lines.map(esc).join('<br>')+
+      (e.comment?'<br>Comment: '+esc(e.comment):'')+(e.files&&e.files.length?'<br>'+e.files.map(f=>'<span class="file">'+I.file+esc(f.name)+'</span>').join(''):'')+'</span></div>').join('');
+  }
+  return h + '</div></div>';
+}
+
+function panel(){
+  const d = S.pdraft, e = S.perr;
+  const p = S.panelSrc==='ticket' ? P(S.openTicket) : null, dl = S.panelSrc==='delivery' ? DL(S.openDelivery) : null;
+  const sub = p ? 'Creates a training child ticket linked to Ticket-'+p.no : 'Creates a commissioning training ticket for drone '+dl.id;
+  const ro = p ? [['Parent Ticket','#'+p.no],['Drone ID',p.drone],['Client',p.cust,1]] : [['Training Type','Commissioning'],['Drone ID',dl.id],['Customer',dl.cust],['Product',dl.product]];
+  const help = p ? ((p.info && p.info.raisedBy) ? 'Pre-filled from “Raised By”. Edit if the pilot is a different person.' : '“Raised By” details aren’t available on this ticket. Enter the pilot’s details.')
+                 : 'Pre-filled from Pilot &amp; Field. Changes here are saved back to Pilot &amp; Field, where they stay editable.';
+  const u = me();
+  const inp = (id,label,val,type,req) => '<div><label class="l" for="'+id+'">'+label+(req?' <span style="color:var(--err)">*</span>':'')+'</label><input id="'+id+'" class="inp" type="'+type+'" value="'+esc(val)+'"'+(e[id]?' aria-invalid="true"':'')+'>'+(e[id]?'<div class="err">'+e[id]+'</div>':'')+'</div>';
+  return '<div class="panel-bd" data-act="closePanel"></div><section class="panel" role="dialog" aria-modal="true" aria-labelledby="pt">'+
+    '<div class="panel-hd"><div class="avatar" style="border-radius:8px;background:var(--bg);color:#3F5275">'+I.cap+'</div><div style="flex:1"><h3 id="pt">Initiate Training</h3><p>'+sub+'</p></div>'+
+    '<button class="x" data-act="closePanel" aria-label="Close panel" style="border:0;background:none;color:var(--ink-2);width:40px;height:40px">'+I.x+'</button></div>'+
+    '<div class="panel-body">'+
+      '<div><div class="sec-t">'+(p?'FROM PARENT TICKET':'FROM DELIVERY RECORD')+' <span class="auto">AUTO-FILLED</span></div><div class="grid2">'+
+        ro.map(r => '<div'+(r[2]?' class="full"':'')+'><span class="l">'+r[0]+'</span><div class="ro">'+esc(r[1])+'</div></div>').join('')+
+        '<div class="full"><span class="l">Raised By</span><div class="ro">'+esc(u.name)+' · '+esc(u.role)+'</div></div></div></div>'+
+      '<div><div class="sec-t">PILOT TO BE TRAINED</div><div class="grid2">'+
+        inp('pn','Pilot Name',d.name,'text',true)+inp('pp','Pilot Phone (SMS goes here)',d.phone,'tel',true)+
+        '<div class="full">'+inp('pe','Pilot Email',d.email,'email',false)+'</div></div>'+
+        '<div class="help">'+help+'</div></div>'+
+      '<div><span class="l">Assigned Trainer <span class="auto">AUTO-ASSIGNED</span></span><div class="ro" style="display:flex;align-items:center;gap:10px"><span class="avatar" style="width:26px;height:26px;font-size:11px;background:#CBD5E1">UM</span>'+TRAINER+'</div></div>'+
+      '<div><label class="l" for="td">Details of Training Needed <span style="color:var(--err)">*</span></label><textarea id="td" class="inp" rows="6" placeholder="What does the pilot need to be trained on, and why?"'+(e.td?' aria-invalid="true"':'')+'>'+esc(d.details)+'</textarea>'+(e.td?'<div class="err">'+e.td+'</div>':'')+'</div>'+
+    '</div><div class="panel-ft"><button class="btn ghost" data-act="closePanel">Cancel</button><button class="btn pri" data-act="createTrn">Create Training Ticket</button></div></section>';
+}
+
+/* ---------- client request (ticket creator) ---------- */
+function tlHtml(t){
+  return '<div class="tline">'+t.events.slice().reverse().map(e =>
+    '<div class="tl-i"><span class="d" style="border-color:'+({created:'var(--trn)',update:'#92400E',sms:'#3557A6',confirm:'var(--star)',closed:'#1B6B2E'}[e.kind])+'"></span><div style="min-width:0"><div class="h">'+esc(e.by)+' '+esc(e.title)+'</div><div class="w">'+fDT(e.at)+'</div>'+
+    '<div class="b">'+e.lines.map(esc).join('<br>')+(e.comment?'<br>Comment: '+esc(e.comment):'')+'</div>'+(e.files&&e.files.length?'<div>'+e.files.map(x=>'<span class="file">'+I.file+esc(x.name)+'</span>').join('')+'</div>':'')+'</div></div>'
+  ).join('')+'</div>';
+}
+function reqDrawer(t){
+  const f = (k,v) => '<div><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+  let h = '<div class="backdrop" data-act="closeReq"></div><aside class="drawer" style="width:min(900px,100%)" role="dialog" aria-modal="true" aria-label="'+t.id+'">';
+  h += '<div class="dr-hd"><h2>'+t.id+'</h2>'+typeChip(t)+chip(t.status)+'<button class="x" data-act="closeReq" aria-label="Close ticket view">'+I.x+'</button></div>';
+  h += '<div class="dr-scroll" style="padding-top:16px">';
+  h += t.status==='Closed'
+    ? '<div class="banner ok">'+I.check+'<span><b>Closed automatically on pilot confirmation</b> · '+fDT(t.closedAt)+' · Rated '+t.rating+'/5</span></div>'
+    : '<div class="banner info">'+I.cap+'<span>Client-requested (chargeable) training, assigned to '+esc(t.trainer)+'. It closes automatically when the pilot confirms.</span></div>';
+  h += '<div class="kv">'+f('Customer',esc(t.client))+f('Drone ID',esc(t.drone||'Not provided'))+f('Received via',esc(t.via))+f('Pilot',esc(t.pilot.name))+f('Pilot Phone',esc(t.pilot.phone))+f('Pilot Email',esc(t.pilot.email||'—'))+
+       f('Raised By',esc(t.createdBy))+f('Raised On',fDT(t.createdAt))+f('Trainer',esc(t.trainer))+f('Expected Completion',t.expected?fISO(t.expected):'Not set')+'</div>';
+  h += '<div class="box2" style="margin-bottom:16px"><h3>Training Request</h3><div class="req">'+esc(t.details)+'</div></div>';
+  h += '<div class="box2"><h3>Timeline</h3>'+tlHtml(t)+'</div>';
+  return h + '</div></aside>';
+}
+function creatorApp(){
+  const q = S.cSearch.trim().toLowerCase();
+  return '<header class="hdr"><div class="logo">General<br>Aeronautics</div><div class="sep"></div><div class="app" style="letter-spacing:.02em">GA SUPPORT</div>'+
+    '<div class="right"><span>English</span><button class="bell" aria-label="Notifications" data-act="na">'+I.bell+'</button><div class="avatar">R</div><div class="who"><b>Ronak</b><span>Ticket Creator GA Krishak</span></div></div></header>'+
+    '<div style="background:var(--surface);display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))">'+
+      '<div><div style="font-size:22px;font-weight:600;color:var(--primary)">GA Krishak</div><button class="link" data-act="na">Switch Space</button></div>'+
+      '<div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:12px"><button class="btn pri" data-act="na">Need Any Support?</button>'+
+      '<span class="newwrap"><button class="btn pri" data-act="openPanelC">'+I.cap+'Initiate Training</button><span class="new">NEW</span></span></div></div>'+
+    '<div class="shell"><nav class="side" aria-label="Ticket creator menu"><div class="it on">Tickets</div></nav>'+
+    '<main class="main"><div class="card"><label class="search" style="max-width:640px"><span class="sr">Search tickets</span><input id="cSearch" type="search" placeholder="Search" value="'+esc(S.cSearch)+'">'+I.search+'</label>'+
+    '<div id="cTable">'+creatorTable()+'</div></div></main></div>'+
+    (S.openReq ? reqDrawer(T(S.openReq)) : '') + (S.panel && S.panelSrc==='creator' ? creatorPanel() : '');
+}
+function creatorTable(){
+  const q = S.cSearch.trim().toLowerCase();
+  const agent = n => '<span style="display:inline-flex;align-items:center;gap:8px;color:var(--link)"><span class="avatar" style="width:24px;height:24px;font-size:10px">'+esc(n.split(' ').map(w=>w[0]).slice(0,2).join(''))+'</span>'+esc(n)+'</span>';
+  let reqs = S.trainings.filter(t => t.type==='Client Request').slice().reverse();
+  let seed = CREATOR_SEED.slice();
+  if(q){ reqs = reqs.filter(t => (t.id+' training request '+t.client).toLowerCase().includes(q)); seed = seed.filter(s => (s.no+' '+s.subj).toLowerCase().includes(q)); }
+  let h = '<div class="tbl-wrap"><table style="min-width:860px"><thead><tr><th>Ticket Number</th><th>Subject</th><th>Status</th><th>CRM Agent</th><th>Raised On</th><th style="text-align:center">Manage</th></tr></thead><tbody>';
+  if(!reqs.length && !seed.length) h += '<tr><td colspan="6" class="empty">No tickets match your search.</td></tr>';
+  reqs.forEach(t => {
+    h += '<tr class="row" data-act="openReq" data-id="'+t.id+'" style="background:#FBFAFF"><td><b>'+t.id+'</b></td><td>Training request · '+esc(t.client)+' <span class="chip" style="background:#EDE9FE;color:#5B21B6;margin-left:4px">Chargeable</span></td><td>'+chip(t.status)+'</td>'+
+      '<td>'+agent(t.trainer)+'</td><td class="num">'+fD(t.createdAt)+'</td><td style="text-align:center"><button class="more" data-act="openReq" data-id="'+t.id+'" aria-label="Open '+t.id+'">···</button></td></tr>';
+  });
+  seed.forEach(s => {
+    h += '<tr><td class="num">'+s.no+'</td><td>'+esc(s.subj)+'</td><td><span style="color:#15803D;display:inline-flex;align-items:center;gap:4px">'+I.check+'Closed</span></td><td>'+agent('Nandhini')+'</td><td class="num">'+s.on+'</td>'+
+      '<td style="text-align:center"><button class="more" data-act="na" aria-label="Open ticket '+s.no+'">···</button></td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+function creatorPanel(){
+  const d = S.cdraft, e = S.perr, m = custMap(), custs = Object.keys(m).sort();
+  const drones = d.cust ? Array.from(m[d.cust]) : [];
+  const inp = (id,label,v,type,req) => '<div><label class="l" for="'+id+'">'+label+(req?' <span style="color:var(--err)">*</span>':'')+'</label><input id="'+id+'" class="inp" type="'+type+'" value="'+esc(v)+'"'+(e[id]?' aria-invalid="true"':'')+'>'+(e[id]?'<div class="err">'+e[id]+'</div>':'')+'</div>';
+  return '<div class="panel-bd" data-act="closePanel"></div><section class="panel" role="dialog" aria-modal="true" aria-labelledby="pt">'+
+    '<div class="panel-hd"><div class="avatar" style="border-radius:8px;background:var(--bg);color:#3F5275">'+I.cap+'</div><div style="flex:1"><h3 id="pt">Initiate Training</h3><p>Log a client-requested (chargeable) training. It goes straight to the trainer.</p></div>'+
+    '<button data-act="closePanel" aria-label="Close panel" style="border:0;background:none;color:var(--ink-2);width:40px;height:40px">'+I.x+'</button></div>'+
+    '<div class="panel-body">'+
+      '<div><div class="sec-t">CLIENT REQUEST</div><div class="grid2">'+
+        '<div class="full"><label class="l" for="pc">Customer <span style="color:var(--err)">*</span></label><select id="pc" class="inp"'+(e.pc?' aria-invalid="true"':'')+'><option value="">Choose customer</option>'+custs.map(c=>'<option'+(d.cust===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>'+(e.pc?'<div class="err">'+e.pc+'</div>':'')+'</div>'+
+        '<div><label class="l" for="pd">Drone ID (optional)</label><select id="pd" class="inp"'+(d.cust?'':' disabled')+'><option value="">'+(d.cust?'Not available':'Choose customer first')+'</option>'+drones.map(x=>'<option'+(d.drone===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
+        '<div><label class="l" for="pv">Received via</label><select id="pv" class="inp">'+['Call','Email','Other'].map(x=>'<option'+(d.via===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
+        '<div class="full"><span class="l">Raised By</span><div class="ro">Ronak · Ticket Creator</div></div></div>'+
+        '<div class="help">If the drone’s delivery record has pilot details, they fill in below.</div></div>'+
+      '<div><div class="sec-t">PILOT TO BE TRAINED</div><div class="grid2">'+inp('pn','Pilot Name',d.name,'text',true)+inp('pp','Pilot Phone (SMS goes here)',d.phone,'tel',true)+'<div class="full">'+inp('pe','Pilot Email',d.email,'email',false)+'</div></div></div>'+
+      '<div><span class="l">Assigned Trainer <span class="auto">AUTO-ASSIGNED</span></span><div class="ro" style="display:flex;align-items:center;gap:10px"><span class="avatar" style="width:26px;height:26px;font-size:11px;background:#CBD5E1">UM</span>'+TRAINER+'</div></div>'+
+      '<div><label class="l" for="td">Details of Training Needed <span style="color:var(--err)">*</span></label><textarea id="td" class="inp" rows="6" placeholder="What did the client ask for?"'+(e.td?' aria-invalid="true"':'')+'>'+esc(d.details)+'</textarea>'+(e.td?'<div class="err">'+e.td+'</div>':'')+'</div>'+
+    '</div><div class="panel-ft"><button class="btn ghost" data-act="closePanel">Cancel</button><button class="btn pri" data-act="createReq">Create Training Ticket</button></div></section>';
+}
+
+/* ---------- delivery tracker ---------- */
+const ICON_EDIT = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
+const ICON_UPC = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
+const SECTIONS = [
+  ['SALES','Rahul','#C2410C','#FFF7ED','#FED7AA'],
+  ['FINANCE — PAYMENT ACK','Sunil','#7E22CE','#FAF5FF','#E9D5FF'],
+  ['CUSTOMER','Rahul','#B45309','#FFFBEB','#FDE68A'],
+  ['COVERAGE','Rahul','#6D28D9','#F5F3FF','#DDD6FE'],
+  ['CONFIGURATION','Rahul','#0E7490','#ECFEFF','#A5F3FC'],
+  ['PRODUCTION','Ronak','#1D4ED8','#EFF6FF','#BFDBFE'],
+  ['QUALITY CONTROL','Sohan','#15803D','#F0FDF4','#BBF7D0'],
+  ['POLARIS','Rahul','#4338CA','#EEF2FF','#C7D2FE'],
+  ['FINANCE','Sunil','#9F1239','#FFF1F2','#FECDD3'],
+  ['DELIVERY & LOGISTICS','Mahesh','#475569','#F8FAFC','#E2E8F0']
+];
+const STAMPED = {'CUSTOMER':1,'PRODUCTION':1,'FINANCE':1,'DELIVERY & LOGISTICS':1};
+
+function deliveryList(){
+  return '<div class="dt-top"><div class="tabs" role="tablist" style="border:0"><button class="tab" role="tab" aria-selected="true">Delivery Records</button><button class="tab na" role="tab" aria-selected="false" data-act="na">PM Calendar</button></div>'+
+    '<div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-bottom:6px;flex:1 1 360px;justify-content:flex-end">'+
+    '<label class="search"><span class="sr">Search deliveries</span><input id="dSearch" type="search" placeholder="Search by customer name or drone ID..." value="'+esc(S.dSearch)+'">'+I.search+'</label>'+
+    '<span class="chip" style="background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)">519 records</span><button class="btn pri" data-act="na">+ New Record</button></div></div>'+
+    '<div id="dTable">'+deliveryTable()+'</div>';
+}
+function deliveryTable(){
+  const q = S.dSearch.trim().toLowerCase();
+  let rows = S.deliveries.map((d,i) => ({d, n:i+1}));
+  if(q) rows = rows.filter(r => (r.d.id+' '+r.d.cust).toLowerCase().includes(q));
+  let h = '<div class="tbl-wrap"><table style="min-width:1180px"><thead><tr><th>#</th><th>Drone ID</th><th>Customer Name</th><th>Type</th><th>Product</th><th>Billed FY</th><th>Actual Dispatch Date</th><th>Commissioning <span class="new">+ TRAINING</span></th><th>Delivery Status</th><th>UIN Status</th><th>Insurance</th><th><span class="sr">Edit</span></th></tr></thead><tbody>';
+  if(!rows.length) h += '<tr><td colspan="12" class="empty">No delivery records match your search.</td></tr>';
+  rows.forEach(({d,n}) => {
+    const tr = S.trainings.filter(t => t.delivery===d.id);
+    let c = d.pilot.date ? '<div class="num">'+fISO(d.pilot.date)+'</div>' : '';
+    c += tr.map(t => '<div style="margin:3px 0"><span class="chip '+stCls(t.status)+'">'+t.id+' · '+esc(t.status)+'</span></div>').join('');
+    if(!c) c = '<span style="color:#94A3B8">—</span>';
+    const ds = d.status==='In Transit' ? 'color:#1D4ED8;background:#EEF4FF;border:1px solid #BFD3FB' : 'color:#15803D;background:#F0FDF4;border:1px solid #86EFAC';
+    h += '<tr class="row" data-act="openDelivery" data-id="'+d.id+'"><td class="num" style="color:var(--muted)">'+n+'</td><td><span class="did">'+d.id+'</span></td><td>'+esc(d.cust)+'</td>'+
+      '<td>'+(d.type==='B2B'?'<span class="chip" style="background:#E8F0FE;color:#1D4ED8;border-radius:4px">B2B</span>':'<span class="chip" style="background:#FEF3C7;color:#92400E;border-radius:4px">Dealer</span>')+'</td>'+
+      '<td>'+d.product+'</td><td class="num">'+d.fy+'</td><td class="num">'+(d.disp||'<span style="color:#94A3B8">—</span>')+'</td><td>'+c+'</td>'+
+      '<td><span class="chip" style="'+ds+';border-radius:6px">'+d.status+'</span></td>'+
+      '<td>'+(d.uin?'<span style="color:#B45309;font-weight:600">'+d.uin+'</span>':'<span style="color:#94A3B8">—</span>')+'</td>'+
+      '<td><span class="did" style="font-family:inherit">'+d.ins+'</span></td>'+
+      '<td><button class="more" style="border-radius:6px;border-color:var(--line-2)" data-act="openDelivery" data-id="'+d.id+'" aria-label="Edit '+d.id+'">'+ICON_EDIT+'</button></td></tr>';
+  });
+  return h + '</tbody></table></div><div style="display:flex;justify-content:flex-end;margin-top:12px;color:var(--ink-2)">1–10 of 519 records (sample rows)</div>';
+}
+function sectHd(t, owner, c, bg, ln, o){
+  o = o || {};
+  return '<div class="sect" style="background:'+bg+';border-color:'+ln+'"'+(o.id?' id="'+o.id+'"':'')+'><div class="sect-hd"><span class="sect-bar" style="background:'+c+'"></span>'+
+    '<span class="sect-t" style="color:'+c+'">'+esc(t)+'</span><span class="owner" style="color:'+c+';background:#fff;border:1px solid '+ln+'">'+esc(owner)+'</span>'+
+    (o.stamp?'<span class="stamp">Ronak · 06-Nov-2026, 04:33 pm</span>':'')+
+    '<span class="sect-ctl"><select class="mini" aria-label="'+esc(t)+' status" disabled'+(o.status?' style="color:#15803D;font-weight:600"':'')+'><option>'+(o.status||'Status')+'</option></select>'+
+    '<button class="mini" data-act="na">✓ Ack</button>'+
+    (o.open ? '<span class="mini" aria-hidden="true" style="color:'+c+'">'+ICON_UPC+'</span>' : '<button class="mini" data-act="naSec" aria-label="Expand '+esc(t)+'" style="color:'+c+'">'+I.down+'</button>')+
+    '</span></div>';
+}
+function deliveryDrawer(d){
+  if(!S.dDraft || S.dDraft.id!==d.id) S.dDraft = Object.assign({id:d.id}, d.pilot);
+  const dd = S.dDraft, k127 = d.id==='K2i00127';
+  const trs = S.trainings.filter(t => t.delivery===d.id).slice().reverse();
+  let h = '<div class="backdrop" data-act="closeDelivery"></div><aside class="drawer" style="width:min(840px,100%)" role="dialog" aria-modal="true" aria-label="Editing '+d.id+'">';
+  h += '<div class="dr-hd"><span class="tag" style="background:none;color:#fff;border-color:rgba(255,255,255,.65)">EDITING</span><span class="did" style="font-size:15px;font-weight:700;background:#fff">'+d.id+'</span>'+
+    '<span style="font-size:16px;font-weight:600">'+esc(d.cust)+'</span><button class="x" data-act="closeDelivery" aria-label="Close delivery record">'+I.x+'</button>'+
+    '<button class="btn" data-act="saveDelivery" style="border-color:#fff">Save Changes</button></div>';
+  h += '<div class="dr-scroll" style="padding-top:16px">';
+  SECTIONS.forEach(s => { h += sectHd(s[0],s[1],s[2],s[3],s[4],{stamp:k127 && STAMPED[s[0]], status:(k127 && s[0]==='PRODUCTION')?'Completed':''})+'</div>'; });
+  h += sectHd('PILOT & FIELD','Bandi Mahesh Pilot','#0F766E','#F0FDFA','#99F6E4',{open:true,id:'pilotSec'});
+  h += '<div class="sect-body"><div class="grid2">'+
+    '<div><label class="l" for="dcd">Commissioning Date</label><input id="dcd" class="inp" type="date" value="'+esc(dd.date)+'"></div>'+
+    '<div><label class="l" for="dpn">Pilot Name</label><input id="dpn" class="inp" type="text" value="'+esc(dd.name)+'"></div>'+
+    '<div><label class="l" for="dpm">Pilot Mobile</label><input id="dpm" class="inp" type="tel" value="'+esc(dd.phone)+'"></div>'+
+    '<div><label class="l" for="dpe">Pilot Email</label><input id="dpe" class="inp" type="email" value="'+esc(dd.email)+'"></div></div>'+
+    '<div class="help">Use Save Changes to store edits on this delivery record.</div>'+
+    '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin:22px 0 12px;padding-top:16px;border-top:1px solid var(--line)">'+
+    '<div class="sec-t" style="margin:0">TRAINING TICKETS ('+trs.length+') <span class="new">NEW</span></div>'+
+    '<button class="btn pri" data-act="openPanelD">'+I.cap+'Initiate Training</button></div>'+
+    (trs.length ? trs.map(groupCard).join('') : '<div class="empty" style="padding:18px;border:1px dashed var(--line-2);border-radius:10px">No training tickets for this drone yet. Use Initiate Training to raise the commissioning training.</div>')+
+    '</div></div>';
+  h += '</div>';
+  if(S.panel && S.panelSrc==='delivery') h += panel();
+  return h + '</aside>';
+}
+
+/* ---------- trainer ---------- */
+function trainerApp(){
+  const openCount = S.trainings.filter(t => t.status!=='Closed').length;
+  return '<header class="hdr"><div class="logo">General<br>Aeronautics</div><div class="sep"></div><div class="app" style="letter-spacing:.02em">GA TRAINING</div>'+
+    '<div class="right"><button class="bell" aria-label="'+openCount+' open training tickets" data-act="trainerHome">'+I.bell+(openCount?'<span>'+openCount+'</span>':'')+'</button>'+
+    '<div class="avatar">UM</div><div class="who"><b>'+TRAINER+'</b><span>Trainer · GA Krishak</span></div></div></header>'+
+    '<div style="background:var(--surface);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))"><div style="font-size:22px;font-weight:600;color:var(--primary)">GA Krishak</div><button class="link" data-act="na">Switch Space</button></div>'+
+    '<div class="shell"><nav class="side" aria-label="Training menu"><div class="it on">'+I.cap+'Training Tickets</div></nav>'+
+    '<main class="main"><div class="card">'+(S.openTrn ? trainerDetail(T(S.openTrn)) : trainerList())+'</div></main></div>';
+}
+
+function trainerList(){
+  const tab = (v,l) => '<button class="tab" role="tab" data-act="trainerTab" data-v="'+v+'" aria-selected="'+(S.trainerTab===v)+'">'+l+'</button>';
+  const n = S.trainings.filter(t => t.status!=='Closed').length, c = S.trainings.length - n;
+  return '<div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;border-bottom:1px solid var(--line)"><div class="tabs" role="tablist" style="border:0">'+tab('open','Open ('+n+')')+tab('closed','Closed ('+c+')')+'</div>'+
+    '<label style="margin:0 0 6px auto;display:flex;align-items:center;gap:8px;color:var(--ink-2);font-size:13px">Type<select id="trType" class="inp" style="width:auto;padding:6px 10px">'+
+      [['all','All'],['Incident','Incident'],['Commissioning','Commissioning']].map(o=>'<option value="'+o[0]+'"'+(S.trainerType===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></label>'+
+    '<label class="search" style="margin:0 0 6px 0"><span class="sr">Search training tickets</span><input id="trSearch" type="search" placeholder="Search by ticket, client, pilot, drone" value="'+esc(S.trainerSearch)+'">'+I.search+'</label></div>'+
+    '<div id="trTable">'+trainerTable()+'</div>';
+}
+function trainerTable(){
+  const q = S.trainerSearch.trim().toLowerCase();
+  let rows = S.trainings.filter(t => S.trainerTab==='open' ? t.status!=='Closed' : t.status==='Closed');
+  if(S.trainerType!=='all') rows = rows.filter(t => t.type===S.trainerType);
+  if(q) rows = rows.filter(t => (t.id+' '+srcLabel(t)+' '+t.client+' '+t.pilot.name+' '+t.drone).toLowerCase().includes(q));
+  let h = '<div class="tbl-wrap"><table style="min-width:1180px"><thead><tr><th>Ticket No</th><th>Type</th><th>Source</th><th>Client</th><th>Pilot</th><th>Drone ID</th><th>Status</th><th>Expected Completion</th><th>Raised By</th><th>Raised On</th><th>Manage</th></tr></thead><tbody>';
+  if(!rows.length){
+    const msg = !S.trainings.length ? 'No training tickets yet. Switch to <b>Pegasus user</b> and use <b>Initiate Training</b> on a ticket timeline a drone’s Pilot &amp; Field section, or the Ticket creator space.' : ((q||S.trainerType!=='all')?'No training tickets match your filters.':(S.trainerTab==='open'?'No open training tickets.':'No closed training tickets yet.'));
+    h += '<tr><td colspan="11" class="empty">'+msg+'</td></tr>';
+  }
+  rows.slice().reverse().forEach(t => {
+    h += '<tr class="row" data-act="openTrn" data-id="'+t.id+'"><td><button class="link" data-act="openTrn" data-id="'+t.id+'" style="font-weight:600">'+t.id+'</button></td><td>'+typeChip(t)+'</td><td style="white-space:nowrap">'+esc(srcLabel(t))+'</td><td>'+esc(t.client)+'</td><td>'+esc(t.pilot.name)+'</td><td>'+esc(t.drone||'—')+'</td><td>'+chip(t.status)+'</td>'+
+      '<td class="num">'+(t.expected?fISO(t.expected):'<span style="color:var(--muted)">Not set</span>')+'</td><td>'+esc(t.createdBy)+'</td><td class="num">'+fD(t.createdAt)+'</td>'+
+      '<td><button class="more" data-act="openTrn" data-id="'+t.id+'" aria-label="Open '+t.id+'">···</button></td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
+function trainerDetail(t){
+  if(!S.draft || S.draft.id!==t.id) S.draft = {id:t.id, expected:t.expected, status:t.status, comment:'', files:[]};
+  const d = S.draft, closed = t.status==='Closed';
+  const canSms = t.status==='Training Completed';
+  let h = '<button class="link" data-act="trainerHome">← Training Tickets</button>';
+  h += '<div class="td-top"><h2>'+t.id+'</h2>'+chip(t.status)+typeChip(t)+'<span style="color:var(--ink-2)">Source: <button class="link" data-act="goSrc" data-id="'+t.id+'">'+esc(srcLabel(t))+'</button></span><div class="push">';
+  if(closed) h += '<button class="btn" disabled>'+I.check+'SMS sent · '+fDT(t.smsAt)+'</button>';
+  else h += '<button class="btn pri" data-act="sendSms"'+(canSms?'':' disabled')+'>'+I.sms+(t.smsAt?'Resend Confirmation SMS':'Send Confirmation SMS to Pilot')+'</button>'+
+            '<span class="help" style="margin:0">'+(canSms?(t.smsAt?'Sent '+fDT(t.smsAt)+'. Waiting for the pilot to confirm.':'Sends a confirmation and rating link to '+esc(t.pilot.phone)+'.'):'Available once the status is Training Completed.')+'</span>';
+  h += '</div></div>';
+  if(closed){
+    h += '<div class="banner ok" style="margin-bottom:16px;align-items:center;flex-wrap:wrap">'+I.check+'<span style="flex:1;min-width:220px"><b>Closed automatically on pilot confirmation.</b><br>'+esc(t.pilot.name)+' confirmed the training was completed on '+fDT(t.closedAt)+'.</span>'+
+      '<span role="img" aria-label="Rated '+t.rating+' out of 5" style="display:flex;align-items:center;gap:2px">'+[1,2,3,4,5].map(i=>'<span style="width:20px;height:20px;display:inline-flex">'+I.star(i<=t.rating)+'</span>').join('')+'<b style="margin-left:6px">'+t.rating+'/5</b></span></div>';
+  }
+  h += '<div class="cols"><div class="l3">';
+  h += '<div class="box2"><h3>Training Request</h3><div class="help" style="margin:0 0 10px">Raised by '+esc(t.createdBy)+' · '+fDT(t.createdAt)+' · Auto-assigned to '+esc(t.trainer)+'</div><div class="req">'+esc(t.details)+'</div></div>';
+  const f = (k,v) => '<div><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+  h += '<div class="box2"><h3>Pilot &amp; Drone</h3><div class="kv" style="padding:0">'+f('Pilot',esc(t.pilot.name))+f('Phone',esc(t.pilot.phone))+f('Email',esc(t.pilot.email||'—'))+f('Client',esc(t.client))+f('Drone ID',esc(t.drone||'Not provided'))+f('Source','<button class="link" data-act="goSrc" data-id="'+t.id+'">'+esc(srcLabel(t))+'</button>')+'</div></div>';
+  if(closed){
+    h += '<div class="box2" style="display:flex;align-items:center;gap:10px;color:var(--ink-2)">'+I.lock+'This ticket is closed. Updates are locked.</div>';
+  } else {
+    h += '<div class="box2"><h3>Update Ticket</h3><div class="grid2">'+
+      '<div><label class="l" for="ed">Expected Date of Completion</label><input id="ed" class="inp" type="date" value="'+esc(d.expected)+'"></div>'+
+      '<div><label class="l" for="st">Status</label><select id="st" class="inp">'+['Open','In Progress','Training Completed'].map(s=>'<option'+(d.status===s?' selected':'')+'>'+s+'</option>').join('')+'</select><div class="help">Closed is set automatically when the pilot confirms.</div></div>'+
+      '<div class="full"><label class="l" for="cm">Comment</label><textarea id="cm" class="inp" rows="3" placeholder="Add a comment for this update">'+esc(d.comment)+'</textarea></div>'+
+      '<div class="full"><span class="l">Attachments</span><div class="drop">'+I.up+'<span>Attach files (PDF, images, video)</span><label for="fi">Browse</label><input id="fi" type="file" multiple class="sr"></div><div id="fileList">'+fileList()+'</div></div>'+
+      '</div>'+(S.derr?'<div class="err" style="margin-top:10px">'+esc(S.derr)+'</div>':'')+
+      '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn pri" data-act="saveUpdate">Save Update</button></div></div>';
+  }
+  h += '</div><div class="l2"><div class="box2"><h3>Timeline</h3><div class="tline">'+t.events.slice().reverse().map(e =>
+      '<div class="tl-i"><span class="d" style="border-color:'+({created:'var(--trn)',update:'#92400E',sms:'#3557A6',confirm:'var(--star)',closed:'#1B6B2E'}[e.kind])+'"></span><div style="min-width:0"><div class="h">'+esc(e.by)+' '+esc(e.title)+'</div><div class="w">'+fDT(e.at)+'</div>'+
+      '<div class="b">'+e.lines.map(esc).join('<br>')+(e.comment?'<br>Comment: '+esc(e.comment):'')+'</div>'+(e.files&&e.files.length?'<div>'+e.files.map(x=>'<span class="file">'+I.file+esc(x.name)+'</span>').join('')+'</div>':'')+'</div></div>'
+    ).join('')+'</div></div></div></div>';
+  return h;
+}
+function fileList(){
+  const d = S.draft; if(!d || !d.files.length) return '';
+  return '<div style="margin-top:8px">'+d.files.map((f,i)=>'<span class="file" style="white-space:normal">'+I.file+esc(f.name)+' · '+kb(f.size)+' <button data-act="rmFile" data-i="'+i+'" aria-label="Remove '+esc(f.name)+'" style="border:0;background:none;color:var(--ink-2);padding:0 2px">'+I.x+'</button></span>').join('')+'</div>';
+}
+
+/* ---------- pilot ---------- */
+function pilotApp(){
+  const pending = S.trainings.filter(t => t.smsAt && t.status!=='Closed');
+  const done = S.trainings.filter(t => t.status==='Closed');
+  let h = '<header class="hdr"><div class="logo">General<br>Aeronautics</div><div class="sep"></div><div class="app">SMS link (simulation)</div></header>';
+  h += '<main class="main"><div class="banner info" style="margin-bottom:18px">'+I.sms+'<span>This stands in for the existing pilot SMS page. Each card is one SMS sent by a trainer. Only the trained pilot receives the link.</span></div>';
+  if(!pending.length && !done.length) h += '<div class="card empty">No SMS sent yet. As the <b>Trainer</b>, set a ticket to Training Completed and send the confirmation SMS.</div>';
+  h += '<div class="phones">';
+  pending.forEach(t => {
+    const r = S.ratings[t.id]||0;
+    h += '<section class="phone" aria-label="SMS to '+esc(t.pilot.name)+'"><div class="help" style="margin:0">To '+esc(t.pilot.phone)+' · '+fT(t.smsAt)+'</div>'+
+      '<div class="sms">Hi '+esc(t.pilot.name)+', please confirm your training ('+t.id+') with '+esc(t.trainer)+' is complete and rate it.</div>'+
+      '<div><div class="l">Your rating</div><div class="stars" role="radiogroup" aria-label="Rating">'+[1,2,3,4,5].map(i=>'<button class="star" role="radio" aria-checked="'+(r===i)+'" aria-label="'+i+' star'+(i>1?'s':'')+'" data-act="rate" data-id="'+t.id+'" data-v="'+i+'">'+I.star(i<=r)+'</button>').join('')+'</div></div>'+
+      '<button class="btn pri" data-act="confirm" data-id="'+t.id+'"'+(r?'':' disabled')+'>Confirm training completed</button>'+(r?'':'<div class="help" style="margin:0">Choose a rating to confirm.</div>')+'</section>';
+  });
+  done.forEach(t => {
+    h += '<section class="phone" aria-label="Confirmed '+t.id+'"><div class="help" style="margin:0">To '+esc(t.pilot.phone)+'</div><div class="sms">Training '+t.id+' confirmed. Thank you!</div>'+
+      '<div style="display:flex;align-items:center;gap:8px">'+chip('Closed')+'<span>Rated '+t.rating+'/5</span></div></section>';
+  });
+  return h + '</div></main>';
+}
+
+/* ---------- render ---------- */
+let lastDrawerKey = null;
+function render(focusId){
+  const sc = document.querySelector('.dr-scroll'), top = sc ? sc.scrollTop : 0;
+  const key = S.openReq || (S.role==='agent' ? (S.nav==='delivery' ? S.openDelivery : S.openTicket) : null) || (S.panel ? 'panel' : null);
+  const body = S.role==='agent' ? agentApp() : S.role==='creator' ? creatorApp() : S.role==='trainer' ? trainerApp() : pilotApp();
+  document.getElementById('app').innerHTML = demoBar() + body;
+  const sc2 = document.querySelector('.dr-scroll');
+  if(sc2 && key && key===lastDrawerKey) sc2.scrollTop = top;
+  lastDrawerKey = key;
+  document.body.style.overflow = key ? 'hidden' : '';
+  if(focusId){ const el = document.getElementById(focusId); if(el) el.focus(); }
+}
+
+/* ---------- actions ---------- */
+function act(a, el){
+  const p = S.openTicket ? P(S.openTicket) : null;
+  switch(a){
+    case 'role': S.role = el.dataset.v; S.panel=false; S.openReq=null; render(); window.scrollTo(0,0); break;
+    case 'reset': S = seed(); render(); toast('Demo reset.'); break;
+    case 'na': toast('Not part of this training prototype.'); break;
+    case 'listTab': S.listTab = el.dataset.v; render(); break;
+    case 'openTicket': S.openTicket = +el.dataset.no; S.tab='timeline'; S.panel=false; S.closeConfirm=false; S.tlSearch=''; S.addNote=false; render(); break;
+    case 'closeDrawer': if(S.panel){ S.panel=false; } else { S.openTicket=null; } render(); break;
+    case 'tab': S.tab = el.dataset.v; render(); break;
+    case 'toggleNote': S.addNote = !S.addNote; S.noteText=''; render(S.addNote?'noteText':null); break;
+    case 'saveNote': {
+      const v = (document.getElementById('noteText').value||'').trim();
+      if(!v){ toast('Write a note before adding it.'); return; }
+      p.events.push({kind:'note', by:me().name, at:new Date(), title:'added ticket note', text:'Note: '+v});
+      S.addNote=false; S.noteText=''; render(); toast('Note added.'); break;
+    }
+    case 'nav': S.nav = el.dataset.v; S.openTicket=null; S.openDelivery=null; S.panel=false; render(); break;
+    case 'openDelivery': S.openDelivery = el.dataset.id; S.dDraft=null; S.panel=false; render(); scrollPilot(); break;
+    case 'closeDelivery': if(S.panel){ S.panel=false; } else { S.openDelivery=null; S.dDraft=null; } render(); break;
+    case 'saveDelivery': {
+      const dl = DL(S.openDelivery), dd = S.dDraft;
+      dl.pilot = {date:dd.date, name:dd.name.trim(), phone:dd.phone.trim(), email:dd.email.trim()};
+      render(); toast('Changes saved to '+dl.id+'.'); break;
+    }
+    case 'naSec': toast('Only the Pilot & Field section is part of this training prototype.'); break;
+    case 'openPanelD': {
+      const dd = S.dDraft;
+      S.panel = true; S.panelSrc='delivery'; S.perr = {};
+      S.pdraft = {name:dd.name, phone:dd.phone, email:dd.email, details:''};
+      render(dd.phone ? 'td' : (dd.name ? 'pp' : 'pn')); break;
+    }
+    case 'openPanelC':
+      S.panel = true; S.panelSrc='creator'; S.perr = {};
+      S.cdraft = {cust:'', drone:'', via:'Call', name:'', phone:'', email:'', details:''};
+      render('pc'); break;
+    case 'openReq': S.openReq = el.dataset.id; render(); break;
+    case 'closeReq': S.openReq = null; render(); break;
+    case 'createReq': {
+      const d = S.cdraft;
+      d.name = val('pn'); d.phone = val('pp'); d.email = val('pe'); d.details = val('td');
+      const e = {};
+      if(!d.cust) e.pc = 'Choose the customer who asked for training.';
+      if(!d.name) e.pn = 'Enter the pilot’s name.';
+      if(!d.phone) e.pp = 'Enter the pilot’s phone number. The confirmation SMS goes here.';
+      else if(d.phone.replace(/\D/g,'').length < 10) e.pp = 'Enter a valid phone number with at least 10 digits.';
+      if(!d.details) e.td = 'Describe the training the client asked for.';
+      S.perr = e;
+      if(Object.keys(e).length){ render(e.pc?'pc':e.pn?'pn':e.pp?'pp':'td'); return; }
+      const now = new Date(), id = 'TRN-'+(S.nextTrn++);
+      S.trainings.push({id, type:'Client Request', parent:null, delivery:null, via:d.via, client:d.cust, drone:d.drone,
+        pilot:{name:d.name, phone:d.phone, email:d.email}, details:d.details, trainer:TRAINER, status:'Open', expected:'',
+        createdBy:'Ronak', createdAt:now, smsAt:null, rating:null, closedAt:null,
+        events:[{kind:'created', by:'Ronak', at:now, title:'created the training ticket', lines:['Client training request received via '+d.via+' (logged in Ticket creator space)', 'Auto-assigned to '+TRAINER]}]});
+      S.panel=false; render();
+      toast('Training ticket '+id+' created and assigned to '+TRAINER+'. It also shows in Pegasus Parent Tickets.'); break;
+    }
+    case 'goSrc': {
+      const t = T(el.dataset.id);
+      S.role='agent'; S.panel=false; S.closeConfirm=false;
+      if(t.type==='Client Request'){ S.nav='parents'; S.openTicket=null; S.openDelivery=null; S.openReq=t.id; render(); }
+      else if(t.parent){ S.nav='parents'; S.openDelivery=null; S.openTicket=t.parent; S.tab='timeline'; render(); }
+      else { S.nav='delivery'; S.openTicket=null; S.openDelivery=t.delivery; S.dDraft=null; S.expanded[t.id]=true; render(); scrollPilot(); }
+      break;
+    }
+    case 'openPanel':
+      S.panel = true; S.perr = {}; S.panelSrc='ticket';
+      S.pdraft = {name:p.pilot.name, phone:p.pilot.phone, email:p.pilot.email, details:''};
+      render(p.pilot.phone ? 'td' : (p.pilot.name ? 'pp' : 'pn')); break;
+    case 'closePanel': S.panel=false; render(); break;
+    case 'createTrn': {
+      const d = S.pdraft = {name:val('pn'), phone:val('pp'), email:val('pe'), details:val('td')};
+      const e = {};
+      if(!d.name) e.pn = 'Enter the pilot’s name.';
+      if(!d.phone) e.pp = 'Enter the pilot’s phone number. The confirmation SMS goes here.';
+      else if(d.phone.replace(/\D/g,'').length < 10) e.pp = 'Enter a valid phone number with at least 10 digits.';
+      if(!d.details) e.td = 'Describe the training needed.';
+      S.perr = e;
+      if(Object.keys(e).length){ render(e.pn?'pn':e.pp?'pp':'td'); return; }
+      const now = new Date(), id = 'TRN-'+(S.nextTrn++), by = me().name;
+      const isD = S.panelSrc==='delivery', dl = isD ? DL(S.openDelivery) : null;
+      S.trainings.push({id, type:isD?'Commissioning':'Incident', parent:isD?null:p.no, delivery:isD?dl.id:null,
+        client:isD?dl.cust:p.cust, drone:isD?dl.id:p.drone, pilot:{name:d.name, phone:d.phone, email:d.email}, details:d.details,
+        trainer:TRAINER, status:'Open', expected:'', createdBy:by, createdAt:now, smsAt:null, rating:null, closedAt:null,
+        events:[{kind:'created', by:by, at:now, title:'created the training ticket', lines:[isD?'Commissioning training created from delivery record '+dl.id+' (Pilot & Field)':'Created from Ticket-'+p.no, 'Auto-assigned to '+TRAINER]}]});
+      if(isD){
+        dl.pilot.name = d.name; dl.pilot.phone = d.phone; dl.pilot.email = d.email;
+        Object.assign(S.dDraft, {name:d.name, phone:d.phone, email:d.email});
+      } else {
+        p.events.push({kind:'training', by:by, at:now, trn:id, title:'initiated training'});
+      }
+      S.panel=false; S.closeConfirm=false; render();
+      toast('Training ticket '+id+' created and assigned to '+TRAINER+'.'+(isD?' Pilot details saved to Pilot & Field.':'')); break;
+    }
+    case 'toggleGrp': {
+      const id = el.dataset.id; S.expanded[id] = !S.expanded[id];
+      el.closest('.ev').outerHTML = groupCard(T(id));
+      const nb = document.querySelector('[data-act="toggleGrp"][data-id="'+id+'"]'); if(nb) nb.focus();
+      break;
+    }
+    case 'askClose': S.closeConfirm = true; render(); break;
+    case 'cancelClose': S.closeConfirm = false; render(); break;
+    case 'confirmClose':
+      p.closed = true; p.events.push({kind:'closed', by:me().name, at:new Date(), title:'closed the ticket'});
+      S.closeConfirm=false; render(); toast('Ticket-'+p.no+' closed.'); break;
+    case 'goTrn': S.role='trainer'; S.openTrn = el.dataset.id; S.draft=null; S.derr=''; render(); window.scrollTo(0,0); break;
+    case 'goParent': S.role='agent'; S.nav='parents'; S.openDelivery=null; S.openTicket = +el.dataset.no; S.tab='timeline'; S.panel=false; S.closeConfirm=false; render(); break;
+    case 'trainerHome': S.openTrn=null; S.draft=null; S.derr=''; render(); break;
+    case 'trainerTab': S.trainerTab = el.dataset.v; render(); break;
+    case 'openTrn': S.openTrn = el.dataset.id; S.draft=null; S.derr=''; render(); window.scrollTo(0,0); break;
+    case 'rmFile': S.draft.files.splice(+el.dataset.i,1); document.getElementById('fileList').innerHTML = fileList(); break;
+    case 'saveUpdate': {
+      const t = T(S.openTrn), d = S.draft;
+      d.expected = val('ed'); d.status = document.getElementById('st').value; d.comment = val('cm');
+      const lines = [];
+      if(d.expected !== t.expected) lines.push(d.expected ? (t.expected?'Expected completion changed from '+fISO(t.expected)+' to '+fISO(d.expected):'Expected completion set to '+fISO(d.expected)) : 'Expected completion cleared');
+      if(d.status !== t.status) lines.push('Status changed from '+t.status+' to '+d.status);
+      if(!lines.length && !d.comment && !d.files.length){ S.derr = 'Change the date or status, add a comment or attach a file before saving.'; render(); return; }
+      if(!lines.length) lines.push(d.files.length && !d.comment ? 'Added '+d.files.length+' file'+(d.files.length>1?'s':'') : 'Added a comment');
+      t.events.push({kind:'update', by:TRAINER, at:new Date(), title:'updated the ticket', lines, comment:d.comment, files:d.files.slice()});
+      t.expected = d.expected; t.status = d.status;
+      S.draft = null; S.derr=''; render();
+      toast(t.status==='Training Completed' && lines.some(l=>l.includes('to Training Completed')) ? 'Saved. You can now send the confirmation SMS to the pilot.' : 'Update saved. It also appears on '+where(t)+'.');
+      break;
+    }
+    case 'sendSms': {
+      const t = T(S.openTrn), now = new Date(); t.smsAt = now;
+      t.events.push({kind:'sms', by:TRAINER, at:now, title:'sent confirmation SMS', lines:['Confirmation and rating link sent to pilot at '+t.pilot.phone]});
+      render(); toast('SMS sent. Switch to “Pilot (SMS link)” to confirm as the pilot.'); break;
+    }
+    case 'rate': S.ratings[el.dataset.id] = +el.dataset.v; render(); break;
+    case 'confirm': {
+      const t = T(el.dataset.id), r = S.ratings[t.id]; if(!r) return;
+      const now = new Date();
+      t.rating = r; t.status = 'Closed'; t.closedAt = now;
+      t.events.push({kind:'confirm', by:t.pilot.name, at:now, title:'(pilot) confirmed training', lines:['Training confirmed as completed · Rating '+r+'/5']});
+      t.events.push({kind:'closed', by:'System', at:new Date(now.getTime()+1000), title:'closed the ticket', lines:['Status changed from Training Completed to Closed', 'Closed automatically after pilot confirmation']});
+      render(); toast(t.id+' closed automatically.'+(t.parent?' Ticket-'+t.parent+' can now be closed if no other training is open.':' Status updated on '+where(t)+'.')); break;
+    }
+  }
+}
+function scrollPilot(){ const s = document.getElementById('pilotSec'); if(s) s.scrollIntoView({block:'start'}); }
+function val(id){ const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if(!el || el.disabled) return;
+  if(el.tagName==='TR' && e.target.closest('button')) return;
+  act(el.dataset.act, el);
+});
+const CFIELD = {pn:'name', pp:'phone', pe:'email', td:'details'};
+document.addEventListener('input', e => {
+  const id = e.target.id;
+  if(S.panel && S.panelSrc==='creator' && S.cdraft && CFIELD[id]){ S.cdraft[CFIELD[id]] = e.target.value; return; }
+  if(id==='cSearch'){ S.cSearch = e.target.value; document.getElementById('cTable').innerHTML = creatorTable(); return; }
+  if(id==='tlSearch'){ S.tlSearch = e.target.value; document.getElementById('tlList').innerHTML = timelineList(P(S.openTicket)); }
+  else if(id==='trSearch'){ S.trainerSearch = e.target.value; document.getElementById('trTable').innerHTML = trainerTable(); }
+  else if(id==='dSearch'){ S.dSearch = e.target.value; document.getElementById('dTable').innerHTML = deliveryTable(); }
+  else if(S.dDraft && id in DFIELD){ S.dDraft[DFIELD[id]] = e.target.value; }
+  else if(id==='noteText'){ S.noteText = e.target.value; }
+  else if(S.draft && id==='cm'){ S.draft.comment = e.target.value; }
+  else if(S.draft && id==='ed'){ S.draft.expected = e.target.value; }
+});
+const DFIELD = {dcd:'date', dpn:'name', dpm:'phone', dpe:'email'};
+document.addEventListener('change', e => {
+  if(e.target.id==='userSel'){ S.user = e.target.value; render(); return; }
+  if(S.panel && S.panelSrc==='creator' && S.cdraft && ['pc','pd','pv'].includes(e.target.id)){
+    const d = S.cdraft, id = e.target.id;
+    if(id==='pv'){ d.via = e.target.value; return; }
+    if(id==='pc'){ d.cust = e.target.value; d.drone = ''; render('pc'); return; }
+    d.drone = e.target.value;
+    const dl = DL(d.drone);
+    if(dl && dl.pilot.name && !d.name && !d.phone){ d.name = dl.pilot.name; d.phone = dl.pilot.phone; d.email = dl.pilot.email; }
+    render('pd'); return;
+  }
+  if(e.target.id==='trType'){ S.trainerType = e.target.value; document.getElementById('trTable').innerHTML = trainerTable(); return; }
+  if(S.dDraft && e.target.id in DFIELD){ S.dDraft[DFIELD[e.target.id]] = e.target.value; }
+  if(e.target.id==='st' && S.draft){ S.draft.status = e.target.value; }
+  if(e.target.id==='fi' && S.draft){
+    Array.from(e.target.files||[]).forEach(f => S.draft.files.push({name:f.name, size:f.size}));
+    e.target.value=''; document.getElementById('fileList').innerHTML = fileList();
+  }
+});
+document.addEventListener('keydown', e => {
+  if(e.key==='Escape' && S.role==='creator'){ if(S.panel){ S.panel=false; render(); } else if(S.openReq){ S.openReq=null; render(); } return; }
+  if(e.key==='Escape' && S.role==='agent' && S.openReq && !S.panel){ S.openReq=null; render(); return; }
+  if(e.key==='Escape' && S.role==='agent'){ if(S.panel){ S.panel=false; render(); } else if(S.openTicket){ S.openTicket=null; render(); } else if(S.openDelivery){ S.openDelivery=null; S.dDraft=null; render(); } }
+});
+render();
+})();
+</script>
+
+</body>
+</html>
